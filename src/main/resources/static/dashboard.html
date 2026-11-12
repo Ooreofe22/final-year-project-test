@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bank Dashboard</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#16202a; --muted:#5b6672; --line:#e3e7eb;
+          --ok:#1f7a4d; --warn:#b26a00; --bad:#b42318; --accent:#1d4ed8; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+           padding:16px 24px; background:var(--card); border-bottom:1px solid var(--line); }
+  h1 { font-size:20px; margin:0; }
+  h2 { font-size:15px; margin:0 0 10px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  main { padding:20px 24px; display:grid; gap:20px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .tile .v { font-size:26px; font-weight:700; }
+  .tile .l { color:var(--muted); font-size:13px; }
+  .tile.bad .v { color:var(--bad); }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
+  .pill.ok { background:#e6f4ec; color:var(--ok); } .pill.bad { background:#fdecea; color:var(--bad); }
+  .pill.warn { background:#fff4e0; color:var(--warn); }
+  input, button { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; }
+  button { background:var(--accent); color:#fff; border-color:var(--accent); cursor:pointer; }
+  #status { color:var(--muted); font-size:13px; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:20px; }
+  .empty { color:var(--muted); padding:8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Offline Payments: Bank Dashboard</h1>
+  <form id="keyForm">
+    <input id="key" type="password" placeholder="Admin key" autocomplete="off" required>
+    <button type="submit">Connect</button>
+    <span id="status">Not connected</span>
+  </form>
+</header>
+<main>
+  <div class="tiles" id="tiles"></div>
+  <section><h2>Accounts</h2><div id="accounts"></div></section>
+  <div class="grid2">
+    <section><h2>Settled payments</h2><div id="payments"></div></section>
+    <section><h2>Devices</h2><div id="devices"></div></section>
+  </div>
+  <section><h2>Blocked attacks and fraud alerts</h2><div id="events"></div></section>
+</main>
+<script>
+let key = "";
+try { key = sessionStorage.getItem("adminKey") || ""; } catch (e) {}
+const naira = n => "₦" + Number(n).toLocaleString("en-NG", { minimumFractionDigits: 2 });
+const time = t => t ? new Date(t).toLocaleTimeString() : "";
+
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text !== undefined && text !== null) e.textContent = String(text);
+  if (cls) e.className = cls;
+  return e;
+}
+function pill(text, kind) { return el("span", text, "pill " + kind); }
+
+function table(target, headers, rows) {
+  const box = document.getElementById(target);
+  box.replaceChildren();
+  if (!rows.length) { box.append(el("div", "Nothing yet", "empty")); return; }
+  const t = el("table"), head = el("tr");
+  headers.forEach(([h, num]) => head.append(el("th", h, num ? "num" : "")));
+  t.append(head);
+  rows.forEach(cells => {
+    const tr = el("tr");
+    cells.forEach(([value, num]) => {
+      const td = el("td", null, num ? "num" : "");
+      if (value instanceof Node) td.append(value); else td.textContent = value ?? "";
+      tr.append(td);
+    });
+    t.append(tr);
+  });
+  box.append(t);
+}
+
+async function get(path) {
+  const r = await fetch(path, { headers: { "X-Admin-Key": key } });
+  if (!r.ok) throw new Error(r.status === 401 ? "Wrong admin key" : "HTTP " + r.status);
+  return r.json();
+}
+
+async function refresh() {
+  if (!key) return;
+  try {
+    const [stats, accounts, payments, devices, events] = await Promise.all([
+      get("/admin/stats"), get("/admin/accounts"), get("/admin/payments"),
+      get("/admin/devices"), get("/admin/security-events")]);
+
+    const blocked = events.filter(e => !e.type.endsWith("_DETECTED")).length;
+    const tiles = document.getElementById("tiles");
+    tiles.replaceChildren();
+    [["Users", stats.users], ["Settled payments", stats.settledPayments], ["Volume", naira(stats.settledVolume)],
+     ["Attacks blocked", blocked, blocked > 0], ["Double-spends", stats.doubleSpends, stats.doubleSpends > 0],
+     ["Overspends", stats.overspends, stats.overspends > 0], ["Frozen devices", stats.frozenDevices, stats.frozenDevices > 0]]
+      .forEach(([l, v, bad]) => { const d = el("div", null, "tile" + (bad ? " bad" : "")); d.append(el("div", v, "v"), el("div", l, "l")); tiles.append(d); });
+
+    table("accounts", [["Name"], ["Email"], ["Main balance", true], ["Status"]],
+      accounts.map(a => [[a.displayName], [a.email], [naira(a.balance), true], [pill(a.status, a.status === "ACTIVE" ? "ok" : "bad")]]));
+
+    table("payments", [["Time"], ["From"], ["To"], ["Amount", true], ["#"], ["Flag"]],
+      payments.map(p => [[time(p.settledAt)], [p.payer], [p.receiver], [naira(p.amount), true], [p.counter],
+        [p.fraudFlag === "NONE" ? pill("OK", "ok") : pill(p.fraudFlag, "bad")]]));
+
+    table("devices", [["Owner"], ["Offline wallet", true], ["Last counter", true], ["Status"]],
+      devices.map(d => [[d.displayName], [naira(d.offlineReserved), true], [d.highestCounterSeen, true],
+        [pill(d.status, d.status === "ACTIVE" ? "ok" : d.status === "FROZEN" ? "bad" : "warn")]]));
+
+    table("events", [["Time"], ["Type"], ["Detail"]],
+      events.map(e => [[time(e.createdAt)], [pill(e.type, e.type.endsWith("_DETECTED") ? "bad" : "warn")], [e.detail]]));
+
+    document.getElementById("status").textContent = "Live, updated " + new Date().toLocaleTimeString();
+  } catch (err) {
+    document.getElementById("status").textContent = err.message;
+  }
+}
+
+document.getElementById("keyForm").addEventListener("submit", e => {
+  e.preventDefault();
+  key = document.getElementById("key").value.trim();
+  try { sessionStorage.setItem("adminKey", key); } catch (e) {}
+  refresh();
+});
+if (key) document.getElementById("key").value = key;
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
