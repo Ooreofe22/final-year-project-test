@@ -209,3 +209,8 @@ The `offline/protocol` and `offline/crypto` packages use **only the Java standar
 - **Double-spend can only be detected, not prevented**, offline (see the threat model).
 
 Built on the auth and security modules of `xpressPay-backend`; the biller, Paystack and virtual-account code was left out because this project doesn't need it.
+
+## Author
+
+**Ooreofeoluwa Popoola**, B.Tech. Information Technology, Bells University of Technology.
+[LinkedIn](https://www.linkedin.com/in/ooreofeoluwa-popoola-8260ba3b4/) · [GitHub](https://github.com/Ooreofe22)
