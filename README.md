@@ -213,4 +213,4 @@ Built on the auth and security modules of `xpressPay-backend`; the biller, Payst
 ## Author
 
 **Ooreofeoluwa Popoola**, B.Tech. Information Technology, Bells University of Technology.
-[LinkedIn](https://www.linkedin.com/in/ooreofeoluwa-popoola-8260ba3b4/) · [GitHub](https://github.com/Ooreofe22)
+[Portfolio](https://ooreofepopoola.dev) · [LinkedIn](https://www.linkedin.com/in/ooreofeoluwa-popoola-8260ba3b4/) · [GitHub](https://github.com/Ooreofe22)
